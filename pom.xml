@@ -10,13 +10,14 @@
     </parent>
     <groupId>biz.markov</groupId>
     <artifactId>nucleus</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <name>nucleus</name>
-    <description>Demo project for Spring Boot using WebFlux</description>
+    <description>Demo project for Spring Boot using WebFlux Security and LDAP</description>
 
     <properties>
         <java.version>11</java.version>
         <kotlin.version>1.3.71</kotlin.version>
+        <docker-maven-plugin.version>0.33.0</docker-maven-plugin.version>
     </properties>
 
     <dependencies>
@@ -95,6 +96,14 @@
 		</dependency>
 	</dependencies>
 
+    <distributionManagement>
+        <repository>
+            <id>internal.repo</id>
+            <name>Internal repo</name>
+            <url>file:///home/vmarkov/.m2/internal</url>
+        </repository>
+    </distributionManagement>
+
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
         <testSourceDirectory>src/test/kotlin</testSourceDirectory>
@@ -144,6 +153,51 @@
                         <version>${kotlin.version}</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <version>${docker-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>Build docker container</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>build</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>Push docker container</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>push</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <images>
+                        <image>
+                            <name>${project.artifactId}</name>
+                            <registry>localhost:5000</registry>
+                            <build>
+                                <from>fabric8/java-centos-openjdk11-jre</from>
+                                <tags>
+                                    <tag>${project.version}</tag>
+                                </tags>
+                                <ports>
+                                    <port>8080</port>
+                                </ports>
+                                <entryPoint>
+                                    <shell>java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Duser.timezone=UTC --add-opens java.base/jdk.internal.misc=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true -jar 'deployments/${project.build.finalName}.jar'</shell>
+                                </entryPoint>
+                                <assembly>
+                                    <targetDir>/deployments</targetDir>
+                                    <descriptorRef>artifact</descriptorRef>
+                                </assembly>
+                            </build>
+                        </image>
+                    </images>
+                </configuration>
             </plugin>
         </plugins>
     </build>
